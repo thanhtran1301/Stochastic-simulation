@@ -1,0 +1,1070 @@
+(* Content-type: application/vnd.wolfram.mathematica *)
+
+(*** Wolfram Notebook File ***)
+(* http://www.wolfram.com/nb *)
+
+(* CreatedBy='Mathematica 10.2' *)
+
+(*CacheID: 234*)
+(* Internal cache information:
+NotebookFileLineBreakTest
+NotebookFileLineBreakTest
+NotebookDataPosition[       158,          7]
+NotebookDataLength[     45344,       1061]
+NotebookOptionsPosition[     43978,       1014]
+NotebookOutlinePosition[     44320,       1029]
+CellTagsIndexPosition[     44277,       1026]
+WindowFrame->Normal*)
+
+(* Beginning of Notebook Content *)
+Notebook[{
+Cell[BoxData[
+ RowBox[{"Remove", "[", "\"\<Global`*\>\"", "]"}]], "Input",
+ CellChangeTimes->{{3.665351462717224*^9, 3.6653515105690737`*^9}, {
+  3.6653529938684864`*^9, 3.665352994709138*^9}, {3.6656093812416224`*^9, 
+  3.6656094084967213`*^9}, {3.665609661749208*^9, 3.6656096743670235`*^9}, {
+  3.6656097145136003`*^9, 3.6656097596575184`*^9}, {3.665610120816827*^9, 
+  3.665610216098049*^9}, {3.6656102636313763`*^9, 3.665610263788492*^9}, {
+  3.665610312046445*^9, 3.6656103139608192`*^9}, {3.665610808643404*^9, 
+  3.6656108151520066`*^9}}],
+
+Cell[TextData[StyleBox["The algorithm\n\nTo start the simulation, we set U as \
+an alias of the uniformly-distributed random number generator from 0 to 1, \
+and NormalDist as an alias of the normally-distributed random number \
+generator from 0 to 1. The algorithm for NormalDist is based on a 2-variable \
+generator in polar coordinate as it is easier to generate them, then we only \
+take one and discard the other. The printing variable denotes whether the \
+modules should print out every result - when we just simulate one election, \
+it should be turned on so that the detail are transparent, but when we \
+simulation 10,000 of them to see the general behavior, printing everything \
+out will exhaust the machine\[CloseCurlyQuote]s resource and most likely \
+cause everything to hang.\n",
+ Background->RGBColor[0.87, 0.94, 1]]], "Text",
+ CellChangeTimes->{3.665700388016143*^9, 3.665700548288743*^9},
+ Background->RGBColor[0.87, 0.94, 1]],
+
+Cell[BoxData[{
+ RowBox[{
+  RowBox[{"U", ":=", 
+   RowBox[{"Random", "[", "]"}]}], ";"}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{"NormalDist", ":=", 
+   RowBox[{
+    SqrtBox[
+     RowBox[{
+      RowBox[{"-", "2"}], 
+      RowBox[{"Log", "[", "U", "]"}]}]], 
+    RowBox[{"Cos", "[", 
+     RowBox[{"2", "\[Pi]", "*", "U"}], "]"}]}]}], ";", " ", 
+  RowBox[{"(*", 
+   RowBox[{"Normal", " ", "Random", " ", "Variable"}], "*)"}]}]}], "Input",
+ CellChangeTimes->{
+  3.665607744758275*^9, {3.665608040143412*^9, 3.665608095928096*^9}, {
+   3.6656094252401557`*^9, 3.6656094709999514`*^9}, 3.665609516261684*^9, {
+   3.665610810218547*^9, 3.6656108130015163`*^9}, {3.6657010316516037`*^9, 
+   3.665701041388488*^9}}],
+
+Cell["\<\
+Swing state simulation process
+
+The module swingState takes in 5 parameters, respectively: the name of the \
+state, number of electoral votes of that state, the percentage of population \
+in the state voting for Red, the percentage of population in the state voting \
+for Blue, and the Margin of Error.
+First, we calculate the percentage of population in the State who actually \
+voted for Red by correcting the Red voters data from the poll using the \
+Margin of Error. The way we treated the Margin of Error is by creating a \
+Normal Random Variable whose standard deviation is half of the Margin of \
+Error. By this way, 95% of the variables will fall between the range given by \
+the Margin of Error, although it will most likely be 0, denoting that the \
+polling data is correct; and its minimum and maximum values are the negation \
+of the Margin of Error, and the Margin of Error itself, respectively.
+Second, we repeat the aforementioned procedure to calculate the percentage of \
+population in the state who actually voted for Blue. Then, we can calculate \
+the percentage of population who are still undecided, or casted a blank vote \
+by subtracting the percentage of voters for Red and Blue from 100.
+For some states, the Margin of Error is too large, making the simulation \
+unreliable and the percentage of undecided population negative. In that case, \
+we ignore the result and regenerate the outcome. Else, we proceed to add all \
+the electoral votes of that state to the winning side, then print out the \
+details if printing is set to 1. Finally, the module returns -1 if Red wins, \
+and 1 if Blue wins, then terminates.
+\
+\>", "Text",
+ CellChangeTimes->{{3.665700516849938*^9, 3.6657005447692537`*^9}},
+ Background->RGBColor[0.87, 0.94, 1]],
+
+Cell[BoxData[
+ RowBox[{
+  RowBox[{"(*", " ", 
+   RowBox[{
+   "define", " ", "a", " ", "function", " ", "that", " ", "determines", " ", 
+    "the", " ", "winner", " ", "in", " ", "a", " ", "state"}], " ", "*)"}], 
+  "\[IndentingNewLine]", 
+  RowBox[{
+   RowBox[{
+    RowBox[{"swingState", "[", 
+     RowBox[{"State_", ",", "EV_", ",", "R_", ",", "B_", ",", "MoE_"}], "]"}],
+     ":=", 
+    RowBox[{"Module", "[", 
+     RowBox[{
+      RowBox[{"{", 
+       RowBox[{"Un", ",", "Win", ",", "redPer", ",", "bluePer", ",", "val"}], 
+       "}"}], ",", "\[IndentingNewLine]", "\[IndentingNewLine]", 
+      RowBox[{
+       RowBox[{"redPer", "=", 
+        RowBox[{"R", "+", 
+         RowBox[{"MoE", "*", 
+          RowBox[{"NormalDist", "/", "2"}]}]}]}], ";", " ", 
+       RowBox[{"(*", " ", 
+        RowBox[{
+         RowBox[{
+         "percentage", " ", "of", " ", "votes", " ", "on", " ", "Red"}], " ", 
+         "\[PlusMinus]", " ", 
+         RowBox[{
+         "a", " ", "uniform", " ", "random", " ", "value", " ", "within", " ",
+           "the", " ", "Margin", " ", "of", " ", "Error"}]}], " ", "*)"}], 
+       "\[IndentingNewLine]", 
+       RowBox[{"bluePer", "=", 
+        RowBox[{"B", "+", 
+         RowBox[{"MoE", "*", 
+          RowBox[{"NormalDist", "/", "2"}]}]}]}], ";", " ", 
+       RowBox[{"(*", " ", 
+        RowBox[{
+         RowBox[{
+         "percentage", " ", "of", " ", "votes", " ", "on", " ", "Blue"}], " ",
+          "\[PlusMinus]", " ", 
+         RowBox[{
+         "a", " ", "uniform", " ", "random", " ", "value", " ", "within", " ",
+           "the", " ", "Margin", " ", "of", " ", "Error"}]}], " ", "*)"}], 
+       "\[IndentingNewLine]", 
+       RowBox[{"Un", "=", 
+        RowBox[{"100", "-", "redPer", "-", "bluePer"}]}], ";", " ", 
+       RowBox[{"(*", " ", 
+        RowBox[{
+        "Rest", " ", "of", " ", "the", " ", "votes", " ", "is", " ", 
+         "undecided"}], "*)"}], "\[IndentingNewLine]", "\[IndentingNewLine]", 
+       RowBox[{"If", "[", 
+        RowBox[{
+         RowBox[{"Un", "<", "0"}], ",", 
+         RowBox[{"swingState", "[", 
+          RowBox[{"State", ",", "EV", ",", "R", ",", "B", ",", "MoE"}], "]"}],
+          ",", "\[IndentingNewLine]", 
+         RowBox[{
+          RowBox[{"If", "[", 
+           RowBox[{
+            RowBox[{"redPer", ">", "bluePer"}], ",", "\[IndentingNewLine]", 
+            RowBox[{
+             RowBox[{"Win", "=", "\"\<Red\>\""}], ";", " ", 
+             RowBox[{"redEV", "=", 
+              RowBox[{"redEV", "+", "EV"}]}]}], ",", " ", 
+            RowBox[{"(*", " ", 
+             RowBox[{
+             "Red", " ", "wins", " ", "in", " ", "the", " ", "state"}], " ", 
+             "*)"}], "\[IndentingNewLine]", 
+            RowBox[{
+             RowBox[{"Win", "=", "\"\<Blue\>\""}], ";", 
+             RowBox[{"blueEV", "=", 
+              RowBox[{"blueEV", "+", "EV"}]}]}]}], "]"}], ";", " ", 
+          RowBox[{"(*", " ", 
+           RowBox[{"Blue", " ", "wins", " ", "in", " ", "the", " ", "state"}],
+            " ", "*)"}], " ", "\[IndentingNewLine]", "\[IndentingNewLine]", 
+          RowBox[{"printResult", "[", 
+           RowBox[{
+           "State", ",", "EV", ",", "redPer", ",", "bluePer", ",", "Un", ",", 
+            "Win"}], "]"}], ";", " ", 
+          RowBox[{"(*", " ", 
+           RowBox[{
+           "Append", " ", "the", " ", "result", " ", "to", " ", "the", " ", 
+            "table"}], " ", "*)"}], "\[IndentingNewLine]", 
+          RowBox[{"val", "=", 
+           RowBox[{"If", "[", 
+            RowBox[{
+             RowBox[{"redPer", ">", "bluePer"}], ",", 
+             RowBox[{"-", "1"}], ",", "1"}], "]"}]}], ";", 
+          "\[IndentingNewLine]", 
+          RowBox[{"Return", "[", "val", "]"}], ";"}]}], "\[IndentingNewLine]",
+         "]"}]}]}], "\[IndentingNewLine]", "]"}]}], ";"}]}]], "Input",
+ CellChangeTimes->{{3.6656110069890656`*^9, 3.665611116540925*^9}, {
+   3.6656112728992596`*^9, 3.665611367094405*^9}, {3.665611766879982*^9, 
+   3.665611781731748*^9}, 3.6657005145953426`*^9, {3.665701024211341*^9, 
+   3.66570102459161*^9}}],
+
+Cell["\<\
+Election simulation process
+
+The module election simulates the election, and requires no parameter. It \
+starts with initiating a 2-dimentional string array of swing states\
+\[CloseCurlyQuote] voting data with the legends - in \
+layman\[CloseCurlyQuote]s term, it\[CloseCurlyQuote]s a table of data with \
+the first row being the explanation of each column; and each simulated swing \
+state\[CloseCurlyQuote]s data will get appended to the table. Then we set the \
+electoral votes of non-swing states to both sides of the election as the \
+initial value, which would then get incremented in the swingState module. \
+After that, we run the simulation of all the 9 swing states\[CloseCurlyQuote] \
+voting to get the final result of the election. If printing is set to 1, the \
+aforementioned completed table will get printed out. Finally, it returns an \
+array of two value: result, which is 0 if Red wins, 1 if Blue wins, and 2 if \
+it\[CloseCurlyQuote]s a draw, and landslide, which is 0 if Red wins in a \
+landslide (i.e. Red wins with more than 300 electoral votes), 1 if Blue wins \
+in a landslide, and Null otherwise.
+\
+\>", "Text",
+ CellChangeTimes->{{3.6657005897489433`*^9, 3.66570060958605*^9}},
+ Background->RGBColor[0.87, 0.94, 1]],
+
+Cell[BoxData[
+ RowBox[{"election", ":=", 
+  RowBox[{"Module", "[", 
+   RowBox[{
+    RowBox[{"{", 
+     RowBox[{
+      RowBox[{"result", "=", "0"}], ",", 
+      RowBox[{"landslide", "=", "0"}]}], "}"}], ",", "\[IndentingNewLine]", 
+    RowBox[{"(*", " ", 
+     RowBox[{
+     "turn", " ", "on", " ", "or", " ", "off", " ", "print", " ", 
+      "statements", " ", "throughout", " ", "the", " ", "code"}], " ", "*)"}],
+     "\[IndentingNewLine]", 
+    RowBox[{
+     RowBox[{"printing", "=", "0"}], ";", "\[IndentingNewLine]", 
+     "\[IndentingNewLine]", 
+     RowBox[{"printTable", "=", 
+      RowBox[{"{", 
+       RowBox[{"{", 
+        RowBox[{
+        "\"\<State\>\"", ",", "\"\<EV\>\"", ",", "\"\<Red %\>\"", ",", " ", 
+         "\"\<Blue %\>\"", ",", "\"\<Undecided\>\"", ",", "\"\<Win\>\""}], 
+        "}"}], "}"}]}], ";", "\[IndentingNewLine]", 
+     RowBox[{
+      RowBox[{"printResult", "[", 
+       RowBox[{
+       "State_", ",", " ", "EV_", ",", " ", "R_", ",", "B_", ",", "Un_", ",", 
+        "Win_"}], "]"}], ":=", 
+      RowBox[{"AppendTo", "[", 
+       RowBox[{"printTable", ",", 
+        RowBox[{"{", 
+         RowBox[{
+         "State", ",", "EV", ",", "R", ",", "B", ",", "Un", ",", "Win"}], 
+         "}"}]}], "]"}]}], ";", "\[IndentingNewLine]", "\[IndentingNewLine]", 
+     RowBox[{"(*", " ", 
+      RowBox[{
+      "given", " ", "Electoral", " ", "Votes", " ", "to", " ", "Red", " ", 
+       "and", " ", "Blue", " ", "from", " ", "other", " ", "states"}], " ", 
+      "*)"}], "\[IndentingNewLine]", 
+     RowBox[{"redEV", "=", "206"}], ";", "\[IndentingNewLine]", 
+     RowBox[{"blueEV", "=", "212"}], ";", "\[IndentingNewLine]", 
+     "\[IndentingNewLine]", 
+     RowBox[{"(*", " ", 
+      RowBox[{
+      "determine", " ", "the", " ", "winners", " ", "in", " ", "each", " ", 
+       "state"}], " ", "*)"}], "\[IndentingNewLine]", 
+     RowBox[{"swingState", "[", 
+      RowBox[{"\"\<Florida\>\"", ",", "29", ",", "47", ",", "44", ",", "1"}], 
+      "]"}], ";", "\[IndentingNewLine]", 
+     RowBox[{"swingState", "[", 
+      RowBox[{
+      "\"\<Pennsylvania\>\"", ",", "20", ",", "46", ",", "47", ",", "2.5"}], 
+      "]"}], ";", "\[IndentingNewLine]", 
+     RowBox[{"swingState", "[", 
+      RowBox[{"\"\<Ohio\>\"", ",", "18", ",", "48", ",", "46", ",", "2"}], 
+      "]"}], ";", "\[IndentingNewLine]", 
+     RowBox[{"swingState", "[", 
+      RowBox[{
+      "\"\<Virginia\>\"", ",", "13", ",", "47", ",", "46", ",", "1.5"}], 
+      "]"}], ";", "\[IndentingNewLine]", 
+     RowBox[{"swingState", "[", 
+      RowBox[{"\"\<Indiana\>\"", ",", "11", ",", "48", ",", "48", ",", "3"}], 
+      "]"}], ";", "\[IndentingNewLine]", 
+     RowBox[{"swingState", "[", 
+      RowBox[{
+      "\"\<Missouri\>\"", ",", "10", ",", "49", ",", "48", ",", "0.5"}], 
+      "]"}], ";", "\[IndentingNewLine]", 
+     RowBox[{"swingState", "[", 
+      RowBox[{
+      "\"\<Colorado\>\"", ",", "9", ",", "45", ",", "48", ",", "1.5"}], "]"}],
+      ";", "\[IndentingNewLine]", 
+     RowBox[{"swingState", "[", 
+      RowBox[{"\"\<Kansas\>\"", ",", "6", ",", "45", ",", "46", ",", "0.5"}], 
+      "]"}], ";", "\[IndentingNewLine]", 
+     RowBox[{"swingState", "[", 
+      RowBox[{"\"\<Iowa\>\"", ",", "6", ",", "44", ",", "48", ",", "3.5"}], 
+      "]"}], ";", "\[IndentingNewLine]", "\[IndentingNewLine]", 
+     "\[IndentingNewLine]", 
+     RowBox[{"(*", " ", 
+      RowBox[{
+      "turn", " ", "on", " ", "or", " ", "off", " ", "the", " ", "printing", 
+       " ", "function"}], " ", "*)"}], "\[IndentingNewLine]", 
+     RowBox[{"If", "[", 
+      RowBox[{
+       RowBox[{"printing", "\[Equal]", "1"}], ",", 
+       RowBox[{
+        RowBox[{"Print", "[", 
+         RowBox[{"Grid", "[", 
+          RowBox[{"printTable", ",", 
+           RowBox[{"Frame", "\[Rule]", "All"}], ",", 
+           RowBox[{"Alignment", "\[Rule]", 
+            RowBox[{"{", 
+             RowBox[{"{", 
+              RowBox[{"Center", ",", "\"\<.\>\""}], "}"}], "}"}]}], ",", 
+           RowBox[{"Background", "\[Rule]", 
+            RowBox[{"{", 
+             RowBox[{"None", ",", 
+              RowBox[{"{", 
+               RowBox[{"{", 
+                RowBox[{"LightBlue", ",", "None"}], "}"}], "}"}]}], "}"}]}]}],
+           "]"}], "]"}], ";"}]}], "]"}], ";", "\[IndentingNewLine]", 
+     "\[IndentingNewLine]", 
+     RowBox[{"(*", 
+      RowBox[{
+       RowBox[{
+       "if", " ", "Red", " ", "has", " ", "more", " ", "electoral", " ", 
+        "votes"}], ",", " ", 
+       RowBox[{
+        RowBox[{"Red", " ", "wins"}], ";", " ", 
+        RowBox[{"if", " ", "Blue", " ", "has", " ", "more"}]}], ",", " ", 
+       RowBox[{
+        RowBox[{"Blue", " ", "wins"}], ";", " ", 
+        RowBox[{"else", " ", "they", " ", "tie"}]}]}], " ", "*)"}], 
+     "\[IndentingNewLine]", 
+     RowBox[{"result", "=", 
+      RowBox[{"Which", "[", 
+       RowBox[{
+        RowBox[{"redEV", ">", "blueEV"}], ",", "0", ",", 
+        RowBox[{"blueEV", ">", "redEV"}], ",", "1", ",", 
+        RowBox[{"redEV", "=", "blueEV"}], ",", "2"}], "]"}]}], ";", 
+     "\[IndentingNewLine]", 
+     RowBox[{"landslide", "=", 
+      RowBox[{"Which", "[", 
+       RowBox[{
+        RowBox[{"redEV", ">", "300"}], ",", "0", ",", 
+        RowBox[{"blueEV", ">", "300"}], ",", "1"}], "]"}]}], ";", " ", 
+     "\[IndentingNewLine]", 
+     RowBox[{"Return", "[", 
+      RowBox[{"{", 
+       RowBox[{"result", ",", "landslide"}], "}"}], "]"}]}]}], 
+   "\[IndentingNewLine]", "]"}]}]], "Input",
+ CellChangeTimes->{{3.6653515234388804`*^9, 3.665351565533656*^9}, {
+   3.665352280039304*^9, 3.6653523036803083`*^9}, 3.665352670467903*^9, {
+   3.6653530438261824`*^9, 3.6653533695294514`*^9}, {3.665353592708444*^9, 
+   3.6653535930906963`*^9}, {3.6653547956496572`*^9, 3.665354800692221*^9}, {
+   3.66535507128053*^9, 3.6653550867106085`*^9}, {3.6653557288938622`*^9, 
+   3.665356085958296*^9}, {3.66542165021307*^9, 3.665421650343161*^9}, {
+   3.6654218131958976`*^9, 3.6654218134010468`*^9}, {3.665421955665541*^9, 
+   3.6654219633610086`*^9}, {3.6654221580313625`*^9, 
+   3.6654221628799615`*^9}, {3.665422198117571*^9, 3.66542221118264*^9}, {
+   3.6654223752933345`*^9, 3.665422405385598*^9}, {3.6654224627676673`*^9, 
+   3.6654224646930084`*^9}, {3.6654226125469036`*^9, 3.66542264587248*^9}, {
+   3.6656071932411733`*^9, 3.6656072118216605`*^9}, {3.6656072525354834`*^9, 
+   3.665607253352054*^9}, 3.665607739977315*^9, {3.665608214023119*^9, 
+   3.6656082621980734`*^9}, 3.66560952068083*^9, {3.665610330247428*^9, 
+   3.6656103428754473`*^9}, {3.665610581628951*^9, 3.66561058380447*^9}, {
+   3.6656107897384768`*^9, 3.6656107980853744`*^9}, {3.6656109266894817`*^9, 
+   3.6656109426433334`*^9}, {3.6656109869467497`*^9, 3.6656109871248803`*^9}, 
+   3.6656110288415775`*^9, 3.6656115228063583`*^9, {3.665612268524587*^9, 
+   3.665612268605644*^9}, {3.665684743998436*^9, 3.665684811275832*^9}, 
+   3.665685812611369*^9, {3.6657006436691732`*^9, 3.6657006518459406`*^9}, {
+   3.665701013179056*^9, 3.665701014318864*^9}, 3.6657010966630745`*^9}],
+
+Cell["\<\
+Swing state analysis
+
+The States module runs each swing state election simulation 1,000 times, then \
+calculate the percentage that each side wins and prints out the calculated \
+data in a table form.\
+\>", "Text",
+ CellChangeTimes->{{3.665700701474559*^9, 3.6657007199496355`*^9}},
+ Background->RGBColor[0.87, 0.94, 1]],
+
+Cell[BoxData[
+ RowBox[{"(*", " ", 
+  RowBox[{
+   RowBox[{
+   "Module", " ", "that", " ", "returns", " ", "the", " ", "probility", " ", 
+    "of", " ", "winning", " ", "for", " ", "both", " ", "sides", " ", "in", 
+    " ", "each", " ", "state", " ", "in", " ", "a", " ", "table", " ", 
+    "after", " ", "1"}], ",", 
+   RowBox[{"000", " ", "times", " ", "of", " ", "simulation"}]}], "  ", 
+  "*)"}]], "Input",
+ CellChangeTimes->{{3.665701055973959*^9, 3.6657011260577545`*^9}}],
+
+Cell[BoxData[
+ RowBox[{
+  RowBox[{"States", ":=", 
+   RowBox[{"Module", "[", 
+    RowBox[{
+     RowBox[{"{", "}"}], ",", "\[IndentingNewLine]", 
+     RowBox[{
+      RowBox[{"StateTable", "=", 
+       RowBox[{"{", 
+        RowBox[{"{", 
+         RowBox[{
+         "\"\<State\>\"", ",", "\"\<EV\>\"", ",", "\"\<Red Win %\>\"", ",", 
+          " ", "\"\<Blue Win %\>\""}], "}"}], "}"}]}], ";", 
+      "\[IndentingNewLine]", "\[IndentingNewLine]", 
+      RowBox[{"Florida", "=", 
+       RowBox[{
+        RowBox[{"Count", "[", 
+         RowBox[{
+          RowBox[{"Table", "[", 
+           RowBox[{
+            RowBox[{"swingState", "[", 
+             RowBox[{
+             "\"\<Florida\>\"", ",", "29", ",", "47", ",", "44", ",", "1"}], 
+             "]"}], ",", "1000"}], "]"}], ",", 
+          RowBox[{"-", "1"}]}], "]"}], "/", "10."}]}], ";", 
+      "\[IndentingNewLine]", 
+      RowBox[{"Penn", "=", 
+       RowBox[{
+        RowBox[{"Count", "[", 
+         RowBox[{
+          RowBox[{"Table", "[", 
+           RowBox[{
+            RowBox[{"swingState", "[", 
+             RowBox[{
+             "\"\<Pennsylvania\>\"", ",", "20", ",", "46", ",", "47", ",", 
+              "2.5"}], "]"}], ",", "1000"}], "]"}], ",", 
+          RowBox[{"-", "1"}]}], "]"}], "/", "10."}]}], ";", 
+      "\[IndentingNewLine]", 
+      RowBox[{"Ohio", "=", 
+       RowBox[{
+        RowBox[{"Count", "[", 
+         RowBox[{
+          RowBox[{"Table", "[", 
+           RowBox[{
+            RowBox[{"swingState", "[", 
+             RowBox[{
+             "\"\<Ohio\>\"", ",", "18", ",", "48", ",", "46", ",", "2"}], 
+             "]"}], ",", "1000"}], "]"}], ",", 
+          RowBox[{"-", "1"}]}], "]"}], "/", "10."}]}], ";", 
+      "\[IndentingNewLine]", 
+      RowBox[{"Virginia", "=", 
+       RowBox[{
+        RowBox[{"Count", "[", 
+         RowBox[{
+          RowBox[{"Table", "[", 
+           RowBox[{
+            RowBox[{"swingState", "[", 
+             RowBox[{
+             "\"\<Virginia\>\"", ",", "13", ",", "47", ",", "46", ",", 
+              "1.5"}], "]"}], ",", "1000"}], "]"}], ",", 
+          RowBox[{"-", "1"}]}], "]"}], "/", "10."}]}], ";", 
+      "\[IndentingNewLine]", 
+      RowBox[{"Indiana", "=", 
+       RowBox[{
+        RowBox[{"Count", "[", 
+         RowBox[{
+          RowBox[{"Table", "[", 
+           RowBox[{
+            RowBox[{"swingState", "[", 
+             RowBox[{
+             "\"\<Indiana\>\"", ",", "11", ",", "48", ",", "48", ",", "3"}], 
+             "]"}], ",", "1000"}], "]"}], ",", 
+          RowBox[{"-", "1"}]}], "]"}], "/", "10."}]}], ";", 
+      "\[IndentingNewLine]", 
+      RowBox[{"Missouri", "=", 
+       RowBox[{
+        RowBox[{"Count", "[", 
+         RowBox[{
+          RowBox[{"Table", "[", 
+           RowBox[{
+            RowBox[{"swingState", "[", 
+             RowBox[{
+             "\"\<Missouri\>\"", ",", "10", ",", "49", ",", "48", ",", 
+              "0.5"}], "]"}], ",", "1000"}], "]"}], ",", 
+          RowBox[{"-", "1"}]}], "]"}], "/", "10."}]}], ";", 
+      "\[IndentingNewLine]", 
+      RowBox[{"Colorado", "=", 
+       RowBox[{
+        RowBox[{"Count", "[", 
+         RowBox[{
+          RowBox[{"Table", "[", 
+           RowBox[{
+            RowBox[{"swingState", "[", 
+             RowBox[{
+             "\"\<Colorado\>\"", ",", "9", ",", "45", ",", "48", ",", "1.5"}],
+              "]"}], ",", "1000"}], "]"}], ",", 
+          RowBox[{"-", "1"}]}], "]"}], "/", "10."}]}], ";", 
+      "\[IndentingNewLine]", 
+      RowBox[{"Kansas", "=", 
+       RowBox[{
+        RowBox[{"Count", "[", 
+         RowBox[{
+          RowBox[{"Table", "[", 
+           RowBox[{
+            RowBox[{"swingState", "[", 
+             RowBox[{
+             "\"\<Kansas\>\"", ",", "6", ",", "45", ",", "46", ",", "0.5"}], 
+             "]"}], ",", "1000"}], "]"}], ",", 
+          RowBox[{"-", "1"}]}], "]"}], "/", "10."}]}], ";", 
+      "\[IndentingNewLine]", 
+      RowBox[{"Iowa", "=", 
+       RowBox[{
+        RowBox[{"Count", "[", 
+         RowBox[{
+          RowBox[{"Table", "[", 
+           RowBox[{
+            RowBox[{"swingState", "[", 
+             RowBox[{
+             "\"\<Iowa\>\"", ",", "6", ",", "44", ",", "48", ",", "3.5"}], 
+             "]"}], ",", "1000"}], "]"}], ",", 
+          RowBox[{"-", "1"}]}], "]"}], "/", "10."}]}], ";", 
+      "\[IndentingNewLine]", "\[IndentingNewLine]", 
+      RowBox[{"AppendTo", "[", 
+       RowBox[{"StateTable", ",", 
+        RowBox[{"{", 
+         RowBox[{"\"\<Florida\>\"", ",", "29", ",", "Florida", ",", 
+          RowBox[{"100", "-", "Florida"}]}], "}"}]}], "]"}], ";", 
+      "\[IndentingNewLine]", 
+      RowBox[{"AppendTo", "[", 
+       RowBox[{"StateTable", ",", 
+        RowBox[{"{", 
+         RowBox[{"\"\<Pennsylvania\>\"", ",", "20", ",", "Penn", ",", 
+          RowBox[{"100", "-", "Penn"}]}], "}"}]}], "]"}], ";", 
+      "\[IndentingNewLine]", 
+      RowBox[{"AppendTo", "[", 
+       RowBox[{"StateTable", ",", 
+        RowBox[{"{", 
+         RowBox[{"\"\<Ohio\>\"", ",", "18", ",", "Ohio", ",", 
+          RowBox[{"100", "-", "Ohio"}]}], "}"}]}], "]"}], ";", 
+      "\[IndentingNewLine]", 
+      RowBox[{"AppendTo", "[", 
+       RowBox[{"StateTable", ",", 
+        RowBox[{"{", 
+         RowBox[{"\"\<Virginia\>\"", ",", "13", ",", "Virginia", ",", 
+          RowBox[{"100", "-", "Virginia"}]}], "}"}]}], "]"}], ";", 
+      "\[IndentingNewLine]", 
+      RowBox[{"AppendTo", "[", 
+       RowBox[{"StateTable", ",", 
+        RowBox[{"{", 
+         RowBox[{"\"\<Indiana\>\"", ",", "11", ",", "Indiana", ",", 
+          RowBox[{"100", "-", "Indiana"}]}], "}"}]}], "]"}], ";", 
+      "\[IndentingNewLine]", 
+      RowBox[{"AppendTo", "[", 
+       RowBox[{"StateTable", ",", 
+        RowBox[{"{", 
+         RowBox[{"\"\<Missouri\>\"", ",", "10", ",", "Missouri", ",", 
+          RowBox[{"100", "-", "Missouri"}]}], "}"}]}], "]"}], ";", 
+      "\[IndentingNewLine]", 
+      RowBox[{"AppendTo", "[", 
+       RowBox[{"StateTable", ",", 
+        RowBox[{"{", 
+         RowBox[{"\"\<Colorado\>\"", ",", "9", ",", "Colorado", ",", 
+          RowBox[{"100", "-", "Colorado"}]}], "}"}]}], "]"}], ";", 
+      "\[IndentingNewLine]", 
+      RowBox[{"AppendTo", "[", 
+       RowBox[{"StateTable", ",", 
+        RowBox[{"{", 
+         RowBox[{"\"\<Kansas\>\"", ",", "6", ",", "Kansas", ",", 
+          RowBox[{"100", "-", "Kansas"}]}], "}"}]}], "]"}], ";", 
+      "\[IndentingNewLine]", 
+      RowBox[{"AppendTo", "[", 
+       RowBox[{"StateTable", ",", 
+        RowBox[{"{", 
+         RowBox[{"\"\<Iowa\>\"", ",", "6", ",", "Iowa", ",", 
+          RowBox[{"100", "-", "Iowa"}]}], "}"}]}], "]"}], ";", 
+      "\[IndentingNewLine]", "\[IndentingNewLine]", 
+      RowBox[{"Print", "[", 
+       RowBox[{"Grid", "[", 
+        RowBox[{"StateTable", ",", 
+         RowBox[{"Frame", "\[Rule]", "All"}], ",", 
+         RowBox[{"Alignment", "\[Rule]", 
+          RowBox[{"{", 
+           RowBox[{"{", 
+            RowBox[{"Center", ",", "\"\<.\>\""}], "}"}], "}"}]}], ",", 
+         RowBox[{"Background", "\[Rule]", 
+          RowBox[{"{", 
+           RowBox[{"None", ",", 
+            RowBox[{"{", 
+             RowBox[{"{", 
+              RowBox[{"LightBlue", ",", "None"}], "}"}], "}"}]}], "}"}]}]}], 
+        "]"}], "]"}], ";"}]}], "\[IndentingNewLine]", "]"}]}], 
+  "\[IndentingNewLine]"}]], "Input",
+ CellChangeTimes->{{3.6656126786116166`*^9, 3.665612701624013*^9}, {
+  3.665612788725295*^9, 3.6656132543028526`*^9}, {3.6656133007295527`*^9, 
+  3.665613362845151*^9}, {3.665613405052907*^9, 3.6656134137890687`*^9}, {
+  3.665613656372088*^9, 3.665613664542633*^9}, {3.6656136961480207`*^9, 
+  3.6656137220288672`*^9}, {3.6656970159175825`*^9, 3.6656971796169615`*^9}, {
+  3.665697360507447*^9, 3.665697385488757*^9}}],
+
+Cell["\<\
+The actual simulation
+
+We then test the election simulation module by running it once. Returning  \
+{0, Null}, it says that Red wins without a landslide. Then, we proceed to \
+find out the general behavior of the simulation by running election module \
+10,000 times, and make a table called Data. The first column of the data that \
+contains the results of the election is then stored in a table ElectionResult \
+and the landslide results in LandslideData.\
+\>", "Text",
+ CellChangeTimes->{{3.6657008354783707`*^9, 3.6657008758519864`*^9}, {
+  3.665700908007563*^9, 3.6657009766271687`*^9}},
+ Background->RGBColor[0.87, 0.94, 1]],
+
+Cell[CellGroupData[{
+
+Cell[BoxData["election"], "Input",
+ CellChangeTimes->{{3.665609532494271*^9, 3.6656095335109425`*^9}}],
+
+Cell[BoxData[
+ TagBox[GridBox[{
+    {"\<\"State\"\>", "\<\"EV\"\>", "\<\"Red %\"\>", "\<\"Blue %\"\>", \
+"\<\"Undecided\"\>", "\<\"Win\"\>"},
+    {"\<\"Florida\"\>", "29", "46.721068637722254`", "42.642767708030966`", 
+     "10.63616365424678`", "\<\"Red\"\>"},
+    {"\<\"Pennsylvania\"\>", "20", "44.92249861881704`", "48.77347374642316`",
+      "6.304027634759805`", "\<\"Blue\"\>"},
+    {"\<\"Ohio\"\>", "18", "48.0379030478578`", "45.678765241518526`", 
+     "6.283331710623671`", "\<\"Red\"\>"},
+    {"\<\"Virginia\"\>", "13", "45.45615880092647`", "45.37854118571583`", 
+     "9.165300013357701`", "\<\"Red\"\>"},
+    {"\<\"Indiana\"\>", "11", "50.82673319012946`", "48.79260602631657`", 
+     "0.3806607835539708`", "\<\"Red\"\>"},
+    {"\<\"Missouri\"\>", "10", "48.81947640387878`", "47.97952438063117`", 
+     "3.20099921549005`", "\<\"Red\"\>"},
+    {"\<\"Colorado\"\>", "9", "46.50167176118601`", "48.42639517249915`", 
+     "5.071933066314841`", "\<\"Blue\"\>"},
+    {"\<\"Kansas\"\>", "6", "44.85311582233745`", "45.994100742173586`", 
+     "9.152783435488963`", "\<\"Blue\"\>"},
+    {"\<\"Iowa\"\>", "6", "43.41355348570244`", "48.83372714099076`", 
+     "7.752719373306803`", "\<\"Blue\"\>"}
+   },
+   AutoDelete->False,
+   GridBoxAlignment->{"Columns" -> {Center, "."}},
+   GridBoxBackground->{"Columns" -> {{None}}, "Rows" -> {{
+        RGBColor[0.87, 0.94, 1], None}}},
+   GridBoxFrame->{"Columns" -> {{True}}, "Rows" -> {{True}}},
+   GridBoxItemSize->{"Columns" -> {{Automatic}}, "Rows" -> {{Automatic}}}],
+  "Grid"]], "Print",
+ CellChangeTimes->{3.6657006481953754`*^9}],
+
+Cell[BoxData[
+ RowBox[{"{", 
+  RowBox[{"0", ",", "Null"}], "}"}]], "Output",
+ CellChangeTimes->{
+  3.665609533834173*^9, 3.665610353697104*^9, 3.6656106034747624`*^9, 
+   3.6656113904449635`*^9, 3.6656120339061856`*^9, 3.6656122724670954`*^9, 
+   3.665613689770503*^9, {3.6656848238512087`*^9, 3.665684830190724*^9}, 
+   3.665700648196377*^9}]
+}, Open  ]],
+
+Cell[BoxData[{
+ RowBox[{
+  RowBox[{"Data", "=", 
+   RowBox[{"Table", "[", 
+    RowBox[{"election", ",", 
+     RowBox[{"{", "10000", "}"}]}], "]"}]}], ";"}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{"ElectionResult", "=", 
+   RowBox[{"Table", "[", 
+    RowBox[{
+     RowBox[{"Data", "[", 
+      RowBox[{"[", 
+       RowBox[{"n", ",", "1"}], "]"}], "]"}], ",", 
+     RowBox[{"{", 
+      RowBox[{"n", ",", "1", ",", "10000"}], "}"}]}], "]"}]}], 
+  ";"}]}], "Input",
+ CellChangeTimes->{{3.6654216739380445`*^9, 3.665421674678626*^9}, {
+   3.6654218187388177`*^9, 3.6654218296236897`*^9}, 3.6654224454463077`*^9, {
+   3.665684835884446*^9, 3.665684837179248*^9}, {3.66569827804288*^9, 
+   3.665698297448623*^9}, {3.6656983534933457`*^9, 3.6656983707815933`*^9}}],
+
+Cell[CellGroupData[{
+
+Cell[BoxData[
+ RowBox[{"Histogram", "[", 
+  RowBox[{"ElectionResult", ",", 
+   RowBox[{"{", "1", "}"}]}], "]"}]], "Input",
+ CellChangeTimes->{{3.6654218402032375`*^9, 3.665421846443631*^9}, {
+  3.665698311415535*^9, 3.665698313907279*^9}}],
+
+Cell[BoxData[
+ GraphicsBox[{
+   {RGBColor[0.987148, 0.8073604000000001, 0.49470040000000004`], EdgeForm[{
+    Opacity[0.6719999999999999], Thickness[Small]}], {}, 
+    {RGBColor[0.987148, 0.8073604000000001, 0.49470040000000004`], EdgeForm[{
+     Opacity[0.6719999999999999], Thickness[Small]}], 
+     TagBox[
+      TooltipBox[
+       TagBox[
+        DynamicBox[{
+          FEPrivate`If[
+           CurrentValue["MouseOver"], 
+           EdgeForm[{
+             GrayLevel[0.5], 
+             AbsoluteThickness[1.5], 
+             Opacity[0.66]}], {}, {}], 
+          RectangleBox[{0., 0}, {1., 8839}, "RoundingRadius" -> 0]},
+         ImageSizeCache->{{33.11274509803922, 
+          192.68137254901964`}, {-100.50939392619793`, 90.46587904652162}}],
+        StatusArea[#, 8839]& ,
+        TagBoxNote->"8839"],
+       StyleBox["8839", {}, StripOnInput -> False]],
+      Annotation[#, 
+       Style[8839, {}], "Tooltip"]& ], 
+     TagBox[
+      TooltipBox[
+       TagBox[
+        DynamicBox[{
+          FEPrivate`If[
+           CurrentValue["MouseOver"], 
+           EdgeForm[{
+             GrayLevel[0.5], 
+             AbsoluteThickness[1.5], 
+             Opacity[0.66]}], {}, {}], 
+          RectangleBox[{1., 0}, {2., 1161}, "RoundingRadius" -> 0]},
+         ImageSizeCache->{{192.18137254901964`, 351.75000000000006`}, {
+          64.9470090475028, 90.46587904652162}}],
+        StatusArea[#, 1161]& ,
+        TagBoxNote->"1161"],
+       StyleBox["1161", {}, StripOnInput -> False]],
+      Annotation[#, 
+       Style[1161, {}], "Tooltip"]& ]}, {}, {}}, {{}, {}}},
+  AspectRatio->NCache[GoldenRatio^(-1), 0.6180339887498948],
+  Axes->{True, True},
+  AxesLabel->{None, None},
+  AxesOrigin->{-0.04, 0},
+  FrameLabel->{{None, None}, {None, None}},
+  FrameTicks->{{Automatic, Automatic}, {Automatic, Automatic}},
+  GridLines->{None, None},
+  GridLinesStyle->Directive[
+    GrayLevel[0.5, 0.4]],
+  PlotRange->{{0., 2.}, {All, All}},
+  PlotRangePadding->{{
+     Scaled[0.02], 
+     Scaled[0.02]}, {
+     Scaled[0.02], 
+     Scaled[0.05]}},
+  Ticks->{Automatic, Automatic}]], "Output",
+ CellChangeTimes->{
+  3.6654218493006663`*^9, 3.6654221754228106`*^9, 3.6654222171708927`*^9, 
+   3.6656073060615616`*^9, {3.6656082237427607`*^9, 3.66560823914365*^9}, 
+   3.665610821083725*^9, 3.665611397601019*^9, 3.665684851558795*^9, 
+   3.6656983211284733`*^9, {3.665698368712111*^9, 3.6656983805689983`*^9}}]
+}, Open  ]],
+
+Cell[CellGroupData[{
+
+Cell[BoxData[
+ RowBox[{"PieChart3D", "[", 
+  RowBox[{"{", 
+   RowBox[{
+    RowBox[{"Count", "[", 
+     RowBox[{"Data", ",", "0"}], "]"}], ",", 
+    RowBox[{"Count", "[", 
+     RowBox[{"Data", ",", "1"}], "]"}], ",", 
+    RowBox[{"Count", "[", 
+     RowBox[{"Data", ",", "2"}], "]"}]}], "}"}], "]"}]], "Input",
+ CellChangeTimes->{{3.6656956970097113`*^9, 3.6656957283254037`*^9}, {
+  3.6656959930455894`*^9, 3.6656959935590005`*^9}}],
+
+Cell[BoxData[
+ Graphics3DBox[
+  {RGBColor[0.5, 0.5, 1.], EdgeForm[{GrayLevel[0], Opacity[0.1]}], {{{}, {
+      {RGBColor[0.980722, 0.7110406, 0.2420506], EdgeForm[{GrayLevel[0], 
+       Opacity[0.1]}], 
+       DynamicModuleBox[{DynamicChart`click$103456 = False}, 
+        GeometricTransformation3DBox[
+         TagBox[
+          TagBox[
+           TooltipBox[
+            TagBox[
+             DynamicBox[{
+               FEPrivate`If[
+                CurrentValue["MouseOver"], 
+                EdgeForm[{
+                  RGBColor[
+                  0.6666666666666666, 0.6666666666666666, 0.6666666666666666], 
+                  AbsoluteThickness[1.5]}], {}, {}], {
+                Polygon3DBox[CompressedData["
+1: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
+7zV5v4BA30cg0PcX73LFf993IPwbkbrU/g==
+                 "]], 
+                
+                BSplineSurface3DBox[{{{-0.7542513807361039, \
+-0.6565857557529564, 0.}, {-0.09766562498314746, -1.4108371364890604`, 0.}, {
+                  0.6565857557529564, -0.7542513807361039, 0.}, {
+                  1.4108371364890604`, -0.09766562498314746, 0.}, {
+                  0.7542513807361039, 0.6565857557529564, 0.}, {
+                  0.09766562498314746, 1.4108371364890604`, 
+                  0.}, {-0.6565857557529564, 0.7542513807361039, 0.}, {-1., 
+                  0.4553047604790488, 0.}, {-1., 0., 
+                  0.}}, {{-0.7542513807361039, -0.6565857557529564, 
+                    1}, {-0.09766562498314746, -1.4108371364890604`, 1}, {
+                   0.6565857557529564, -0.7542513807361039, 1}, {
+                   1.4108371364890604`, -0.09766562498314746, 1}, {
+                   0.7542513807361039, 0.6565857557529564, 1}, {
+                   0.09766562498314746, 1.4108371364890604`, 
+                    1}, {-0.6565857557529564, 0.7542513807361039, 1}, {-1., 
+                    0.4553047604790488, 1}, {-1., 0., 1}}}, 
+                 SplineDegree -> {1, 2}, 
+                 SplineWeights -> {{1., 0.7071067811865475, 1., 
+                  0.7071067811865475, 1., 0.7071067811865475, 1., 
+                  0.9101059706849955, 1.}, {1., 0.7071067811865475, 1., 
+                  0.7071067811865475, 1., 0.7071067811865475, 1., 
+                  0.9101059706849955, 1.}}, 
+                 SplineKnots -> {{0, 0, 1, 1}, {0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 
+                   4, 4}}], 
+                
+                Polygon3DBox[{{{0., 0., 0.}, {0., 0., 
+                 1.}, {-0.7542513807361039, -0.6565857557529564, 
+                 1.}, {-0.7542513807361039, -0.6565857557529564, 0.}}}], 
+                
+                Polygon3DBox[{{{0., 0., 0.}, {0., 0., 1.}, {-1., 
+                 1.2246467991473532`*^-16, 1.}, {-1., 
+                 1.2246467991473532`*^-16, 0.}}}]}},
+              
+              ImageSizeCache->{{25.16620849937989, 
+               398.03442589598995`}, {-130.55682419971816`, 
+               135.0382460482656}}],
+             StatusArea[#, 8860]& ,
+             TagBoxNote->"8860"],
+            StyleBox["8860", {
+              GrayLevel[0], FontFamily -> "Arial"}, StripOnInput -> False]],
+           Annotation[#, 
+            Style[8860, {
+              GrayLevel[0], FontFamily -> "Arial"}], "Tooltip"]& ],
+          
+          EventHandlerTag[{
+           "MouseClicked" :> FEPrivate`Set[DynamicChart`click$103456, 
+              FEPrivate`Not[DynamicChart`click$103456]], PassEventsDown -> 
+            True, Method -> "Preemptive", PassEventsUp -> True}]], Dynamic[
+         If[DynamicChart`click$103456, {{{1., 0, 0}, {0, 1., 0}, {
+             0, 0, 1.}}, {0.1873099773496385, 0.07010686403825178, 0}}, {{1, 
+           0, 0}, {0, 1, 0}, {0, 0, 1}}, {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}}], 
+          TrackedSymbols :> {DynamicChart`click$103456}]],
+        DynamicModuleValues:>{}]}, 
+      {RGBColor[0.757, 0.40959999999999996`, 0.1], EdgeForm[{GrayLevel[0], 
+       Opacity[0.1]}], 
+       DynamicModuleBox[{DynamicChart`click$103457 = False}, 
+        GeometricTransformation3DBox[
+         TagBox[
+          TagBox[
+           TooltipBox[
+            TagBox[
+             DynamicBox[{
+               FEPrivate`If[
+                CurrentValue["MouseOver"], 
+                EdgeForm[{
+                  RGBColor[
+                  0.6666666666666666, 0.6666666666666666, 0.6666666666666666], 
+                  AbsoluteThickness[1.5]}], {}, {}], {
+                Polygon3DBox[CompressedData["
+1:eJxTTMoPSmVmYGBgAmIJIAaxRwF+EK+3/NRlpRf7//jVKx5gerofJr7z+Qrl
+3cUv97OUi5V5pT6Gi39t5HFkWflq/xv58x9PbHoIF3+ydVJ7/MHX+32/7ldQ
+u3UfLq45VfjAnN1v9sttbfLQ0rkDF2+Mm5m4Ztrb/c+fvWyYE38DLs6nyrpj
+QeC7/ZxcL6XnVFyBi6+c9Pfputfv9mfkOcmlVl+Ai9s95j+on/J+f9PxZr/p
+N07AxXNsRNoX7Hq/n6V+fk3e/ANwcYdegZzF797vz3t5WbdixQa4OAR82M8e
+I2KstmzhHvyh9sF+VBxZHD3cPthjD+cP9tjj5YM99nj8YI893j/YY08nH+yx
+p6sP9tjT4Qd77On2gz32dP7BHnu++GCPPR99sAcAJ9zxAA==
+                 "]], 
+                
+                BSplineSurface3DBox[{{{-1., -1.2246467991473532`*^-16, 
+                  0.}, {-1., -0.3742825931124224, 
+                  0.}, {-0.7542513807361038, -0.6565857557529564, 
+                  0.}}, {{-1., -1.2246467991473532`*^-16, 
+                    1}, {-1., -0.3742825931124224, 
+                    1}, {-0.7542513807361038, -0.6565857557529564, 1}}}, 
+                 SplineDegree -> {1, 2}, 
+                 SplineWeights -> {{1., 0.9365498867481924, 1.}, {1., 
+                  0.9365498867481924, 1.}}, 
+                 SplineKnots -> {{0, 0, 1, 1}, {0, 0, 0, 1, 1, 1}}], 
+                
+                Polygon3DBox[{{{0., 0., 0.}, {0., 0., 
+                 1.}, {-1., -1.2246467991473532`*^-16, 
+                 1.}, {-1., -1.2246467991473532`*^-16, 0.}}}], 
+                
+                Polygon3DBox[{{{0., 0., 0.}, {0., 0., 
+                 1.}, {-0.7542513807361039, -0.6565857557529564, 
+                 1.}, {-0.7542513807361039, -0.6565857557529564, 0.}}}]}},
+              ImageSizeCache->{{38.05346954230619, 
+               180.99999999999994`}, {-28.570852816696707`, 
+               56.207823526227806`}}],
+             StatusArea[#, 1140]& ,
+             TagBoxNote->"1140"],
+            StyleBox["1140", {
+              GrayLevel[0], FontFamily -> "Arial"}, StripOnInput -> False]],
+           Annotation[#, 
+            Style[1140, {
+              GrayLevel[0], FontFamily -> "Arial"}], "Tooltip"]& ],
+          
+          EventHandlerTag[{
+           "MouseClicked" :> FEPrivate`Set[DynamicChart`click$103457, 
+              FEPrivate`Not[DynamicChart`click$103457]], PassEventsDown -> 
+            True, Method -> "Preemptive", PassEventsUp -> True}]], Dynamic[
+         If[DynamicChart`click$103457, {{{1., 0, 0}, {0, 1., 0}, {
+             0, 0, 1.}}, {-0.18730997734963847`, -0.07010686403825181, 0}}, {{
+           1, 0, 0}, {0, 1, 0}, {0, 0, 1}}, {{1, 0, 0}, {0, 1, 0}, {0, 0, 
+           1}}], TrackedSymbols :> {DynamicChart`click$103457}]],
+        DynamicModuleValues:>{}]}, {}}}, {}}, {}},
+  BoxRatios->{1, 1, 0.1},
+  Boxed->False,
+  FaceGridsStyle->Automatic,
+  LabelStyle->{
+    GrayLevel[0], FontFamily -> "Arial"},
+  Lighting->"Neutral",
+  PlotRange->{{1.2, -1.2}, {1.2, -1.2}, {0, 1}},
+  ViewPoint->{0, -2.4, 2}]], "Output",
+ CellChangeTimes->{3.665695728994874*^9, 3.66569577435007*^9, 
+  3.6656959957285037`*^9}]
+}, Open  ]],
+
+Cell[BoxData[
+ RowBox[{
+  RowBox[{"LandslideData", "=", 
+   RowBox[{"Table", "[", 
+    RowBox[{
+     RowBox[{"Data", "[", 
+      RowBox[{"[", 
+       RowBox[{"n", ",", "2"}], "]"}], "]"}], ",", 
+     RowBox[{"{", 
+      RowBox[{"n", ",", "1", ",", "10000"}], "}"}]}], "]"}]}], ";"}]], "Input",
+ CellChangeTimes->{{3.6656849043550797`*^9, 3.6656849207176723`*^9}, {
+  3.6656983950882998`*^9, 3.665698406815572*^9}}],
+
+Cell[CellGroupData[{
+
+Cell[BoxData[{
+ RowBox[{
+  RowBox[{"Count", "[", 
+   RowBox[{"LandslideData", ",", "1"}], "]"}], "/", 
+  "10000."}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{"Count", "[", 
+   RowBox[{"LandslideData", ",", "0"}], "]"}], "/", "10000."}]}], "Input",
+ CellChangeTimes->{{3.6656849376473293`*^9, 3.6656849888861036`*^9}, {
+  3.665686623028604*^9, 3.6656866236020126`*^9}}],
+
+Cell[BoxData["0.`"], "Output",
+ CellChangeTimes->{3.665684950018919*^9, 3.6656849899968805`*^9, 
+  3.6656866240663366`*^9, 3.6656984091592207`*^9}],
+
+Cell[BoxData["0.12010000000000001`"], "Output",
+ CellChangeTimes->{3.665684950018919*^9, 3.6656849899968805`*^9, 
+  3.6656866240663366`*^9, 3.6656984091612215`*^9}]
+}, Open  ]],
+
+Cell[CellGroupData[{
+
+Cell[BoxData["States"], "Input"],
+
+Cell[BoxData[
+ TagBox[GridBox[{
+    {"\<\"State\"\>", "\<\"EV\"\>", "\<\"Red Win %\"\>", "\<\"Blue Win %\"\>"},
+    {"\<\"Florida\"\>", "29", "100.`", "0.`"},
+    {"\<\"Pennsylvania\"\>", "20", "27.200000000000003`", "72.8`"},
+    {"\<\"Ohio\"\>", "18", "92.5`", "7.5`"},
+    {"\<\"Virginia\"\>", "13", "81.5`", "18.5`"},
+    {"\<\"Indiana\"\>", "11", "52.300000000000004`", "47.699999999999996`"},
+    {"\<\"Missouri\"\>", "10", "99.80000000000001`", "0.19999999999998863`"},
+    {"\<\"Colorado\"\>", "9", "0.1`", "99.9`"},
+    {"\<\"Kansas\"\>", "6", "0.4`", "99.6`"},
+    {"\<\"Iowa\"\>", "6", "5.1000000000000005`", "94.9`"}
+   },
+   AutoDelete->False,
+   GridBoxAlignment->{"Columns" -> {Center, "."}},
+   GridBoxBackground->{"Columns" -> {{None}}, "Rows" -> {{
+        RGBColor[0.87, 0.94, 1], None}}},
+   GridBoxFrame->{"Columns" -> {{True}}, "Rows" -> {{True}}},
+   GridBoxItemSize->{"Columns" -> {{Automatic}}, "Rows" -> {{Automatic}}}],
+  "Grid"]], "Print",
+ CellChangeTimes->{3.6656974026799164`*^9}]
+}, Open  ]]
+},
+WindowSize->{1350, 685},
+WindowMargins->{{-8, Automatic}, {Automatic, 0}},
+FrontEndVersion->"10.2 for Microsoft Windows (64-bit) (July 29, 2015)",
+StyleDefinitions->"Default.nb"
+]
+(* End of Notebook Content *)
+
+(* Internal cache information *)
+(*CellTagsOutline
+CellTagsIndex->{}
+*)
+(*CellTagsIndex
+CellTagsIndex->{}
+*)
+(*NotebookFileOutline
+Notebook[{
+Cell[558, 20, 546, 8, 31, "Input"],
+Cell[1107, 30, 944, 13, 160, "Text"],
+Cell[2054, 45, 711, 19, 54, "Input"],
+Cell[2768, 66, 1769, 28, 274, "Text"],
+Cell[4540, 96, 4045, 94, 352, "Input"],
+Cell[8588, 192, 1251, 21, 179, "Text"],
+Cell[9842, 215, 6972, 151, 632, "Input"],
+Cell[16817, 368, 330, 8, 84, "Text"],
+Cell[17150, 378, 476, 10, 31, "Input"],
+Cell[17629, 390, 7687, 197, 532, "Input"],
+Cell[25319, 589, 639, 12, 122, "Text"],
+Cell[CellGroupData[{
+Cell[25983, 605, 102, 1, 31, "Input"],
+Cell[26088, 608, 1590, 30, 171, "Print"],
+Cell[27681, 640, 343, 7, 31, "Output"]
+}, Open  ]],
+Cell[28039, 650, 760, 19, 52, "Input"],
+Cell[CellGroupData[{
+Cell[28824, 673, 239, 5, 31, "Input"],
+Cell[29066, 680, 2398, 62, 233, "Output"]
+}, Open  ]],
+Cell[CellGroupData[{
+Cell[31501, 747, 432, 11, 31, "Input"],
+Cell[31936, 760, 9801, 189, 242, "Output"]
+}, Open  ]],
+Cell[41752, 952, 414, 11, 31, "Input"],
+Cell[CellGroupData[{
+Cell[42191, 967, 371, 9, 52, "Input"],
+Cell[42565, 978, 147, 2, 31, "Output"],
+Cell[42715, 982, 164, 2, 31, "Output"]
+}, Open  ]],
+Cell[CellGroupData[{
+Cell[42916, 989, 32, 0, 31, "Input"],
+Cell[42951, 991, 1011, 20, 171, "Print"]
+}, Open  ]]
+}
+]
+*)
+
+(* End of internal cache information *)
